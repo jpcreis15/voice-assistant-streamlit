@@ -1,0 +1,54 @@
+services:
+  tiles:
+    build: .
+    image: voice-poc
+    container_name: voice-poc-container
+    ports:
+      - 80:8501
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - some-net
+
+  database:
+    container_name: voice-poc-database
+    image: postgres:latest
+    env_file: .env
+    environment:
+      - POSTGRES_USER=${APP_DATABASE_USER}
+      - POSTGRES_PASSWORD=${APP_DATABASE_PASS}
+      - POSTGRES_DB=${APP_DATABASE_NAME}
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres-data-voice-poc:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${APP_DATABASE_USER} -d ${APP_DATABASE_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - some-net
+
+  pgweb:
+    image: sosedoff/pgweb
+    container_name: pgweb-voice-poc-database
+    depends_on:
+      - database
+    env_file: .env
+    environment:
+      PGWEB_DATABASE_URL: postgres://${APP_DATABASE_USER}:${APP_DATABASE_PASS}@database:5432/${APP_DATABASE_NAME}?sslmode=disable
+    ports:
+      - 8085:8081
+    networks:
+      - some-net
+    restart: always
+
+volumes:
+  postgres-data-voice-poc:
+
+networks:
+  some-net:
+    driver: bridge
